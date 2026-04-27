@@ -12,12 +12,17 @@ function drawBoard() {
       cell.classList.add("cell");
       cell.innerText = board[i][j];
 
-      cell.onclick = () => {
-        if (board[i][j] === "") {
-          board[i][j] = "X";
-          drawBoard();
-        }
-      };
+    cell.onclick = () => {
+  if (board[i][j] === "") {
+    board[i][j] = "X";
+
+    if (checkWinner("X")) {
+      alert("Ganaste");
+    }
+
+    drawBoard();
+  }
+};
 
       boardDiv.appendChild(cell);
     }
@@ -25,3 +30,17 @@ function drawBoard() {
 }
 
 drawBoard();
+
+function checkWinner(player) {
+  // filas y columnas
+  for (let i = 0; i < N; i++) {
+    if (board[i].every(cell => cell === player)) return true;
+    if (board.map(row => row[i]).every(cell => cell === player)) return true;
+  }
+
+  // diagonales
+  if (board.map((row, i) => row[i]).every(c => c === player)) return true;
+  if (board.map((row, i) => row[N - i - 1]).every(c => c === player)) return true;
+
+  return false;
+}
