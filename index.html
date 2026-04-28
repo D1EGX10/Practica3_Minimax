@@ -2,8 +2,105 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Gato 4x4</title>
-  <link rel="stylesheet" href="diseño.css">
+  <title>Gato 4x4 - Minimax vs Alpha-Beta</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      text-align: center;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+
+    h1 {
+      color: white;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+      margin-bottom: 20px;
+    }
+
+    #board {
+      display: grid;
+      grid-template-columns: repeat(4, 100px);
+      gap: 8px;
+      justify-content: center;
+      margin: 20px auto;
+      background: rgba(255,255,255,0.1);
+      padding: 20px;
+      border-radius: 15px;
+      width: fit-content;
+    }
+
+    .cell {
+      width: 100px;
+      height: 100px;
+      background: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 48px;
+      font-weight: bold;
+      cursor: pointer;
+      border-radius: 10px;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    .cell:hover {
+      transform: scale(1.05);
+      background: #f0f0f0;
+      box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+    }
+
+    button {
+      background: #4CAF50;
+      color: white;
+      border: none;
+      padding: 12px 30px;
+      font-size: 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      margin: 20px 0;
+      transition: all 0.3s ease;
+      font-weight: bold;
+    }
+
+    button:hover {
+      background: #45a049;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+
+    .stats {
+      background: rgba(255,255,255,0.95);
+      padding: 15px;
+      border-radius: 10px;
+      display: inline-block;
+      margin: 10px auto;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    .stats p {
+      margin: 8px 0;
+      font-size: 16px;
+      font-weight: bold;
+    }
+
+    #minimaxCount {
+      color: #ff6b6b;
+      font-size: 20px;
+    }
+
+    #alphaCount {
+      color: #4ecdc4;
+      font-size: 20px;
+    }
+
+    #turn {
+      color: #764ba2;
+      font-size: 18px;
+    }
+  </style>
 </head>
 <body>
 
@@ -11,6 +108,377 @@
 
 <div id="board"></div>
 
-<script src="script.js"></script>
+<button onclick="resetGame()">Reiniciar</button>
+
+<div class="stats">
+  <p>Minimax nodos: <span id="minimaxCount">0</span></p>
+  <p>Alpha-Beta nodos: <span id="alphaCount">0</span></p>
+  <p>Turno: <span id="turn">Jugador (X)</span></p>
+</div>
+
+<script>
+  // ==================== JUEGO COMPLETO ====================
+  const N = 4;
+  let board = Array(N).fill().map(() => Array(N).fill(""));
+  let gameOver = false;
+  let playerTurn = true;
+  let nodesMinimax = 0;
+  let nodesAlphaBeta = 0;
+
+  function drawBoard() {
+    const boardDiv = document.getElementById("board");
+    if (!boardDiv) return;
+    
+    boardDiv.innerHTML = "";
+    updateTurnDisplay();
+
+    for (let i = 0; i < N; i++) {
+      for (let j = 0; j < N; j++) {
+        const cell = document.createElement("div");
+        cell.classList.add("cell");
+        cell.innerText = board[i][j];
+        
+        if (board[i][j] === "X") cell.style.color = "#ff6b6b";
+        if (board[i][j] === "O") cell.style.color = "#4ecdc4";
+
+        cell.onclick = (function(x, y) {
+          return function() {
+            if (board[x][y] !== "" || gameOver || !playerTurn) return;
+
+            board[x][y] = "X";
+            playerTurn = false;
+
+            if (checkWinner("X")) {
+              drawBoard();
+              alert("🎉 ¡Ganaste! 🎉");
+              gameOver = true;
+              updateTurnDisplay();
+              return;
+            }
+
+            if (isFull()) {
+              drawBoard();
+              alert("🤝 ¡Empate! 🤝");
+              gameOver = true;
+              updateTurnDisplay();
+              return;
+            }
+
+            drawBoard();
+
+            setTimeout(() => {
+              if (!gameOver && !playerTurn) {
+                nodesMinimax = 0;
+                nodesAlphaBeta = 0;
+                
+                let move = bestMoveAlphaBeta();
+
+                if (move) {
+                  board[move.i][move.j] = "O";
+                  
+                  if (checkWinner("O")) {
+                    drawBoard();
+                    alert("🤖 ¡Gana la IA! 🤖");
+                    gameOver = true;
+                    updateTurnDisplay();
+                    return;
+                  }
+                  
+                  if (isFull()) {
+                    drawBoard();
+                    alert("🤝 ¡Empate! 🤝");
+                    gameOver = true;
+                    updateTurnDisplay();
+                    return;
+                  }
+                  
+                  playerTurn = true;
+                  drawBoard();
+                  
+                  document.getElementById("minimaxCount").innerText = nodesMinimax;
+                  document.getElementById("alphaCount").innerText = nodesAlphaBeta;
+                }
+              }
+            }, 100);
+          };
+        })(i, j);
+
+        boardDiv.appendChild(cell);
+      }
+    }
+  }
+
+  function updateTurnDisplay() {
+    const turnSpan = document.getElementById("turn");
+    if (!turnSpan) return;
+    
+    if (gameOver) {
+      turnSpan.innerText = "Juego Terminado";
+      turnSpan.style.color = "#ff6b6b";
+    } else {
+      turnSpan.innerText = playerTurn ? "Jugador (X)" : "IA (O)";
+      turnSpan.style.color = playerTurn ? "#ff6b6b" : "#4ecdc4";
+    }
+  }
+
+  function isFull() {
+    for (let i = 0; i < N; i++) {
+      for (let j = 0; j < N; j++) {
+        if (board[i][j] === "") return false;
+      }
+    }
+    return true;
+  }
+
+  function checkWinner(player) {
+    // Filas
+    for (let i = 0; i < N; i++) {
+      let win = true;
+      for (let j = 0; j < N; j++) {
+        if (board[i][j] !== player) {
+          win = false;
+          break;
+        }
+      }
+      if (win) return true;
+    }
+    
+    // Columnas
+    for (let j = 0; j < N; j++) {
+      let win = true;
+      for (let i = 0; i < N; i++) {
+        if (board[i][j] !== player) {
+          win = false;
+          break;
+        }
+      }
+      if (win) return true;
+    }
+    
+    // Diagonal principal
+    let win = true;
+    for (let i = 0; i < N; i++) {
+      if (board[i][i] !== player) {
+        win = false;
+        break;
+      }
+    }
+    if (win) return true;
+    
+    // Diagonal secundaria
+    win = true;
+    for (let i = 0; i < N; i++) {
+      if (board[i][N - i - 1] !== player) {
+        win = false;
+        break;
+      }
+    }
+    if (win) return true;
+    
+    return false;
+  }
+
+  function evaluate() {
+    if (checkWinner("O")) return 100000;
+    if (checkWinner("X")) return -100000;
+    
+    let score = 0;
+    
+    // Evaluar filas
+    for (let i = 0; i < N; i++) {
+      let aiCount = 0, playerCount = 0, emptyCount = 0;
+      for (let j = 0; j < N; j++) {
+        if (board[i][j] === "O") aiCount++;
+        else if (board[i][j] === "X") playerCount++;
+        else emptyCount++;
+      }
+      if (aiCount > 0 && playerCount === 0) {
+        score += Math.pow(aiCount, 3);
+        if (aiCount === 3 && emptyCount === 1) score += 5000;
+      }
+      if (playerCount > 0 && aiCount === 0) {
+        score -= Math.pow(playerCount, 3);
+        if (playerCount === 3 && emptyCount === 1) score -= 10000;
+      }
+    }
+    
+    // Evaluar columnas
+    for (let j = 0; j < N; j++) {
+      let aiCount = 0, playerCount = 0, emptyCount = 0;
+      for (let i = 0; i < N; i++) {
+        if (board[i][j] === "O") aiCount++;
+        else if (board[i][j] === "X") playerCount++;
+        else emptyCount++;
+      }
+      if (aiCount > 0 && playerCount === 0) {
+        score += Math.pow(aiCount, 3);
+        if (aiCount === 3 && emptyCount === 1) score += 5000;
+      }
+      if (playerCount > 0 && aiCount === 0) {
+        score -= Math.pow(playerCount, 3);
+        if (playerCount === 3 && emptyCount === 1) score -= 10000;
+      }
+    }
+    
+    // Diagonal principal
+    let aiCount = 0, playerCount = 0, emptyCount = 0;
+    for (let i = 0; i < N; i++) {
+      if (board[i][i] === "O") aiCount++;
+      else if (board[i][i] === "X") playerCount++;
+      else emptyCount++;
+    }
+    if (aiCount > 0 && playerCount === 0) {
+      score += Math.pow(aiCount, 3);
+      if (aiCount === 3 && emptyCount === 1) score += 5000;
+    }
+    if (playerCount > 0 && aiCount === 0) {
+      score -= Math.pow(playerCount, 3);
+      if (playerCount === 3 && emptyCount === 1) score -= 10000;
+    }
+    
+    // Diagonal secundaria
+    aiCount = 0, playerCount = 0, emptyCount = 0;
+    for (let i = 0; i < N; i++) {
+      if (board[i][N - i - 1] === "O") aiCount++;
+      else if (board[i][N - i - 1] === "X") playerCount++;
+      else emptyCount++;
+    }
+    if (aiCount > 0 && playerCount === 0) {
+      score += Math.pow(aiCount, 3);
+      if (aiCount === 3 && emptyCount === 1) score += 5000;
+    }
+    if (playerCount > 0 && aiCount === 0) {
+      score -= Math.pow(playerCount, 3);
+      if (playerCount === 3 && emptyCount === 1) score -= 10000;
+    }
+    
+    // Control del centro
+    const centers = [[1,1], [1,2], [2,1], [2,2]];
+    for (let [i,j] of centers) {
+      if (board[i][j] === "O") score += 10;
+      if (board[i][j] === "X") score -= 10;
+    }
+    
+    return score;
+  }
+
+  function alphabeta(depth, alpha, beta, isMax) {
+    nodesAlphaBeta++;
+    
+    const evalScore = evaluate();
+    
+    if (depth === 0 || Math.abs(evalScore) >= 100000 || isFull()) {
+      return evalScore;
+    }
+    
+    if (isMax) {
+      let best = -Infinity;
+      for (let i = 0; i < N; i++) {
+        for (let j = 0; j < N; j++) {
+          if (board[i][j] === "") {
+            board[i][j] = "O";
+            best = Math.max(best, alphabeta(depth - 1, alpha, beta, false));
+            board[i][j] = "";
+            alpha = Math.max(alpha, best);
+            if (beta <= alpha) break;
+          }
+        }
+        if (beta <= alpha) break;
+      }
+      return best;
+    } else {
+      let best = Infinity;
+      for (let i = 0; i < N; i++) {
+        for (let j = 0; j < N; j++) {
+          if (board[i][j] === "") {
+            board[i][j] = "X";
+            best = Math.min(best, alphabeta(depth - 1, alpha, beta, true));
+            board[i][j] = "";
+            beta = Math.min(beta, best);
+            if (beta <= alpha) break;
+          }
+        }
+        if (beta <= alpha) break;
+      }
+      return best;
+    }
+  }
+
+  function minimax(depth, isMax) {
+    nodesMinimax++;
+    
+    const evalScore = evaluate();
+    
+    if (depth === 0 || Math.abs(evalScore) >= 100000 || isFull()) {
+      return evalScore;
+    }
+    
+    if (isMax) {
+      let best = -Infinity;
+      for (let i = 0; i < N; i++) {
+        for (let j = 0; j < N; j++) {
+          if (board[i][j] === "") {
+            board[i][j] = "O";
+            best = Math.max(best, minimax(depth - 1, false));
+            board[i][j] = "";
+          }
+        }
+      }
+      return best;
+    } else {
+      let best = Infinity;
+      for (let i = 0; i < N; i++) {
+        for (let j = 0; j < N; j++) {
+          if (board[i][j] === "") {
+            board[i][j] = "X";
+            best = Math.min(best, minimax(depth - 1, true));
+            board[i][j] = "";
+          }
+        }
+      }
+      return best;
+    }
+  }
+
+  function bestMoveAlphaBeta() {
+    let bestVal = -Infinity;
+    let move = null;
+    const depth = 3;
+    
+    for (let i = 0; i < N; i++) {
+      for (let j = 0; j < N; j++) {
+        if (board[i][j] === "") {
+          board[i][j] = "O";
+          const valAB = alphabeta(depth, -Infinity, Infinity, false);
+          board[i][j] = "";
+          
+          if (valAB > bestVal) {
+            bestVal = valAB;
+            move = {i, j};
+          }
+        }
+      }
+    }
+    
+    return move;
+  }
+
+  function resetGame() {
+    board = Array(N).fill().map(() => Array(N).fill(""));
+    gameOver = false;
+    playerTurn = true;
+    nodesMinimax = 0;
+    nodesAlphaBeta = 0;
+    
+    document.getElementById("minimaxCount").innerText = 0;
+    document.getElementById("alphaCount").innerText = 0;
+    
+    drawBoard();
+  }
+
+  // Iniciar el juego
+  drawBoard();
+</script>
+
 </body>
 </html>
